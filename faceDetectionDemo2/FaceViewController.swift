@@ -3,6 +3,8 @@ import AVFoundation
 
 class FaceViewController: UIViewController,AVCaptureMetadataOutputObjectsDelegate, AVCapturePhotoCaptureDelegate {
     
+    var faces = [CGRect]()
+    
     var previewLayer: AVCaptureVideoPreviewLayer!
     var faceRectCALayer: CALayer!
     
@@ -28,40 +30,45 @@ class FaceViewController: UIViewController,AVCaptureMetadataOutputObjectsDelegat
         photoOutput.capturePhoto(with: photoSettings, delegate: self)
     }
     
+    func increaseRect(rect: CGRect, byPercentage percentage: CGFloat) -> CGRect {
+        let startWidth = rect.width
+        let startHeight = rect.height
+        let adjustmentWidth = (startWidth * (percentage+100)/100) / 2.0
+        let adjustmentHeight = (startHeight * (percentage+100)/100) / 2.0
+        return rect.insetBy(dx: -adjustmentWidth, dy: -adjustmentHeight)
+    }
+    
     func capture(_ captureOutput: AVCapturePhotoOutput, didFinishProcessingPhotoSampleBuffer photoSampleBuffer: CMSampleBuffer?, previewPhotoSampleBuffer: CMSampleBuffer?, resolvedSettings: AVCaptureResolvedPhotoSettings, bracketSettings: AVCaptureBracketedStillImageSettings?, error: Error?) {
-        
-        if let error = error {
-            print("Error capturing photo: \(error)")
-        } else {
+
             if let sampleBuffer = photoSampleBuffer, let dataImage = AVCapturePhotoOutput.jpegPhotoDataRepresentation(forJPEGSampleBuffer: sampleBuffer, previewPhotoSampleBuffer: nil) {
                 
                 if let image = UIImage(data: dataImage) {
-                    UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
+                    
+                    //Currently always working in portrait
+                    
+                    let exactWidthHeight = ((faces[0].height)/380)*1080
+                    let newMinX = (faces[0].minY/670)*1920
+                    let newMinY = (((380-faces[0].minX)/380)*1080)-exactWidthHeight
+                
+                    var rect = CGRect(x: newMinX, y: newMinY, width: exactWidthHeight, height: exactWidthHeight)
+                    
+                    rect = increaseRect(rect: rect, byPercentage: 50)
+                    
+                    //NB origin of cgImage is in the top right!
+                    var newimage = image.cgImage
+                    newimage = newimage?.cropping(to: rect)
+                    
+                    let croppedImage = UIImage(cgImage: newimage!, scale: image.scale, orientation: .right)
+
+                    UIImageWriteToSavedPhotosAlbum(croppedImage, nil, nil, nil);
                 }
             }
-        }
-        
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        setupSession()
-        setupPreview()
-        setupFace()
-        startSession()
-
-    }
-
-    override func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Dispose of any resources that can be recreated.
-    }
-    
-    
-    // MARK: - Setup session and preview
-    //This gets run onnly once at setup
-    func setupSession(){
+        //setupSession()
         session = AVCaptureSession()
         session.sessionPreset = AVCaptureSessionPresetHigh
         
@@ -85,7 +92,7 @@ class FaceViewController: UIViewController,AVCaptureMetadataOutputObjectsDelegat
         }
         
         let metadataOutput = AVCaptureMetadataOutput()
-
+        
         if session.canAddOutput(metadataOutput) {
             session.addOutput(metadataOutput)
             
@@ -101,57 +108,52 @@ class FaceViewController: UIViewController,AVCaptureMetadataOutputObjectsDelegat
             print("Could not add photo output to the session")
         }
         
-
-
-    }
-    
-    
-    func setupPreview(){
+        //setupPreview()
         previewLayer = AVCaptureVideoPreviewLayer(session: session)
         previewLayer.frame = view.bounds
         previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill
         view.layer.addSublayer(previewLayer)
-    }
-    
-    
-    func startSession() {
+        
+        //setupFace()
+        faceRectCALayer = CALayer()
+        previewLayer.addSublayer(faceRectCALayer)
+        
+        //startSession()
         if !session.isRunning{
             session.startRunning()
         }
+
+    }
+
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        // Dispose of any resources that can be recreated.
     }
     
-    func setupFace(){
-        faceRectCALayer = CALayer()
-        faceRectCALayer.zPosition = 1
-        faceRectCALayer.borderColor = UIColor.red.cgColor
-        faceRectCALayer.borderWidth = 3.0
-
-        previewLayer.addSublayer(faceRectCALayer)
-    }
     
     
     func captureOutput(_ captureOutput: AVCaptureOutput!, didOutputMetadataObjects metadataObjects: [Any]!, from connection: AVCaptureConnection!) {
         
-        var faces = [CGRect]()
+        self.faces = [CGRect]()
         
         for metadataObject in metadataObjects as! [AVMetadataObject] {
             if metadataObject.type == AVMetadataObjectTypeFace {
                     let transformedMetadataObject = previewLayer.transformedMetadataObject(for: metadataObject)
                     let face = transformedMetadataObject?.bounds
+                
                     faces.append(face!)
             }
         }
         
-        print("FACE",faces)
         self.faceRectCALayer.sublayers?.forEach { $0.removeFromSuperlayer() }
 
-        if faces.count > 0 {
+        if self.faces.count > 0 {
             setlayerHidden(false)
             DispatchQueue.main.async(execute: {
                 () -> Void in
                 
                 //Removes the squares from the last iteration
-                for face in faces {
+                for face in self.faces {
                     let newLayer = CALayer()
                     newLayer.zPosition = 1
                     newLayer.borderColor = UIColor.red.cgColor
