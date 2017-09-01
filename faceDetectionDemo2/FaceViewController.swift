@@ -28,15 +28,9 @@ class FaceViewController: UIViewController,AVCaptureMetadataOutputObjectsDelegat
         
         let photoSettings = AVCapturePhotoSettings()
         photoOutput.capturePhoto(with: photoSettings, delegate: self)
+        //from here "func capture(_ captureOutput: AVCapturePhotoOutput, didFinishPro..." is called
     }
     
-    func increaseRect(rect: CGRect, byPercentage percentage: CGFloat) -> CGRect {
-        let startWidth = rect.width
-        let startHeight = rect.height
-        let adjustmentWidth = (startWidth * (percentage+100)/100) / 2.0
-        let adjustmentHeight = (startHeight * (percentage+100)/100) / 2.0
-        return rect.insetBy(dx: -adjustmentWidth, dy: -adjustmentHeight)
-    }
     
     func capture(_ captureOutput: AVCapturePhotoOutput, didFinishProcessingPhotoSampleBuffer photoSampleBuffer: CMSampleBuffer?, previewPhotoSampleBuffer: CMSampleBuffer?, resolvedSettings: AVCaptureResolvedPhotoSettings, bracketSettings: AVCaptureBracketedStillImageSettings?, error: Error?) {
 
@@ -58,11 +52,28 @@ class FaceViewController: UIViewController,AVCaptureMetadataOutputObjectsDelegat
                     var newimage = image.cgImage
                     newimage = newimage?.cropping(to: rect)
                     
-                    let croppedImage = UIImage(cgImage: newimage!, scale: image.scale, orientation: .right)
-
-                    UIImageWriteToSavedPhotosAlbum(croppedImage, nil, nil, nil);
+                    var croppedImage = UIImage(cgImage: newimage!, scale: image.scale, orientation: .right)
+                    
+                    //UIImageWriteToSavedPhotosAlbum(croppedImage, nil, nil, nil);
+                    croppedImage = croppedImage.image(withRotation: 3*3.14159/2)
+                    let ImagePNG = UIImagePNGRepresentation(croppedImage)
+                    let imageData:NSData = ImagePNG! as NSData
+                    let strBase64 = imageData.base64EncodedString(options: .lineLength64Characters)
+                    print("imagestart")
+                    print(strBase64)
+                    print("imageend")
+                    
                 }
             }
+    }
+    
+    //Expands the bounds of the rectangle to get all of the face in the picture
+    func increaseRect(rect: CGRect, byPercentage percentage: CGFloat) -> CGRect {
+        let startWidth = rect.width
+        let startHeight = rect.height
+        let adjustmentWidth = (startWidth * (percentage+100)/100) / 2.0
+        let adjustmentHeight = (startHeight * (percentage+100)/100) / 2.0
+        return rect.insetBy(dx: -adjustmentWidth, dy: -adjustmentHeight)
     }
 
     override func viewDidLoad() {
@@ -169,13 +180,161 @@ class FaceViewController: UIViewController,AVCaptureMetadataOutputObjectsDelegat
     
     func setlayerHidden(_ hidden: Bool) {
         if (faceRectCALayer.isHidden != hidden){
-            print("hidden:" ,hidden)
-            DispatchQueue.main.async(execute: { 
+            DispatchQueue.main.async(execute: {
                 () -> Void in
                 self.faceRectCALayer.isHidden = hidden
             })
         }
     }
     
+    //-------------------------------------------------------
+    //----This is where the face detection wrappers start----
+    //-------------------------------------------------------
+    func GetGalleryIDs(GetGalleryIDsCallBack:@escaping (String) -> ()) {
+        let url = URL(string: "https://api.kairos.com/gallery/view")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("66261a1d", forHTTPHeaderField: "app_id")
+        request.addValue("11da5256b834011f91378a81202a1393", forHTTPHeaderField: "app_key")
+        
+        request.httpBody = "{\n  \"gallery_name\": \"MyGallery\"\n}".data(using: .utf8)
+        
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            //if let response = response, let data = data {
+            if let data = data {
+                GetGalleryIDsCallBack(String(data: data, encoding: .utf8)!)
+            } else {
+                GetGalleryIDsCallBack( "You got an error")
+            }
+        }
+        
+        task.resume()
+    }
+    
+    
+    func PostNewFace(ImageString: String, NameString: String, GalleryString: String, PostNewFaceCallBack:@escaping (String) -> ()){
+        
+        let url = URL(string: "https://api.kairos.com/enroll")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("66261a1d", forHTTPHeaderField: "app_id")
+        request.addValue("11da5256b834011f91378a81202a1393", forHTTPHeaderField: "app_key")
+        
+        request.httpBody = ("{\n  \"image\": \"" + ImageString + "\",\n  \"subject_id\": \"" + NameString + "\",\n  \"gallery_name\": \"" + GalleryString + "\"\n}").data(using: .utf8)
+        
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            //if let response = response, let data = data {
+            if let data = data {
+                //PostNewFaceCallBack(response)
+                PostNewFaceCallBack(String(data: data, encoding: .utf8)!)
+            } else {
+                PostNewFaceCallBack("You got an error")
+            }
+        }
+        
+        task.resume()
+    }
+    
+    func VerifyFace(ImageString: String, NameString: String, GalleryString: String, VerifyFaceCallBack:@escaping (String) -> ()){
+        let url = URL(string: "https://api.kairos.com/verify")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("66261a1d", forHTTPHeaderField: "app_id")
+        request.addValue("11da5256b834011f91378a81202a1393", forHTTPHeaderField: "app_key")
+        
+        request.httpBody = ("{\n  \"image\": \"" + ImageString + "\",\n  \"gallery_name\": \"" + GalleryString + "\",\n  \"subject_id\": \"" + NameString + "\"\n}").data(using: .utf8)
+        
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            //if let response = response, let data = data {
+            if let data = data {
+                //VerifyFaceCallBack(response)
+                VerifyFaceCallBack(String(data: data, encoding: .utf8)!)
+            } else {
+                VerifyFaceCallBack("Youve got an error")
+            }
+        }
+        
+        task.resume()
+    }
+    
+    func RecogniseFace(ImageString: String, GalleryString: String, RecogniseFaceCallBack:@escaping (String) -> ()){
+        let url = URL(string: "https://api.kairos.com/recognize")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("66261a1d", forHTTPHeaderField: "app_id")
+        request.addValue("11da5256b834011f91378a81202a1393", forHTTPHeaderField: "app_key")
+        
+        request.httpBody = ("{\n  \"image\": \"" + ImageString + "\",\n  \"gallery_name\": \"" + GalleryString + "\"\n}").data(using: .utf8)
+        
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            //if let response = response, let data = data {
+            if let data = data {
+                //RecogniseFaceCallBack(response)
+                RecogniseFaceCallBack(String(data: data, encoding: .utf8)!)
+            } else {
+                RecogniseFaceCallBack("Youve got an error")
+            }
+        }
+        
+        task.resume()
+    }
+    
+    func RemoveID(NameString: String, GalleryString: String, RemoveIDCallBack:@escaping (String) -> ()){
+        let url = URL(string: "https://api.kairos.com/gallery/remove_subject")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("66261a1d", forHTTPHeaderField: "app_id")
+        request.addValue("11da5256b834011f91378a81202a1393", forHTTPHeaderField: "app_key")
+        
+        request.httpBody = ("{\n  \"gallery_name\": \"" + GalleryString + "\",\n  \"subject_id\": \"" + NameString + "\"\n}").data(using: .utf8)
+        
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            //if let response = response, let data = data {
+            if let data = data {
+                //RemoveIDCallBack(response)
+                RemoveIDCallBack(String(data: data, encoding: .utf8)!)
+            } else {
+                RemoveIDCallBack("Youve got an error")
+            }
+        }
+        
+        task.resume()
+    }
 
+
+}
+
+
+//An extension to UIImage which lets you rotate it, NB. the extension is on the file level
+extension UIImage {
+    func image(withRotation radians: CGFloat) -> UIImage {
+        let cgImage = self.cgImage!
+        let LARGEST_SIZE = CGFloat(max(self.size.width, self.size.height))
+        let context = CGContext.init(data: nil, width:Int(LARGEST_SIZE), height:Int(LARGEST_SIZE), bitsPerComponent: cgImage.bitsPerComponent, bytesPerRow: 0, space: cgImage.colorSpace!, bitmapInfo: cgImage.bitmapInfo.rawValue)!
+        
+        var drawRect = CGRect.zero
+        drawRect.size = self.size
+        let drawOrigin = CGPoint(x: (LARGEST_SIZE - self.size.width) * 0.5,y: (LARGEST_SIZE - self.size.height) * 0.5)
+        drawRect.origin = drawOrigin
+        var tf = CGAffineTransform.identity
+        tf = tf.translatedBy(x: LARGEST_SIZE * 0.5, y: LARGEST_SIZE * 0.5)
+        tf = tf.rotated(by: CGFloat(radians))
+        tf = tf.translatedBy(x: LARGEST_SIZE * -0.5, y: LARGEST_SIZE * -0.5)
+        context.concatenate(tf)
+        context.draw(cgImage, in: drawRect)
+        var rotatedImage = context.makeImage()!
+        
+        drawRect = drawRect.applying(tf)
+        
+        rotatedImage = rotatedImage.cropping(to: drawRect)!
+        let resultImage = UIImage(cgImage: rotatedImage)
+        return resultImage
+        
+        
+    }
 }
