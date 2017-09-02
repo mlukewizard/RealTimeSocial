@@ -3,6 +3,10 @@ import AVFoundation
 
 class FaceViewController: UIViewController,AVCaptureMetadataOutputObjectsDelegate, AVCapturePhotoCaptureDelegate {
     
+    override var prefersStatusBarHidden: Bool {
+        return true
+    }
+    
     //variables for storing face information
     var faces = [CGRect]()
     var touchedFace: Int?
