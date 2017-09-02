@@ -124,9 +124,11 @@ func RemoveID(NameString: String, GalleryString: String, RemoveIDCallBack:@escap
 }
 
 
+
 GetGalleryIDs() { success in
     print(success)
 }
+
 
 /*
 PostNewFace(ImageString: "http://media.kairos.com/kairos-elizabeth.jpg", NameString: "Elizabeth1", GalleryString: "MyGallery"){success in
@@ -139,16 +141,19 @@ VerifyFace(ImageString: "http://media.kairos.com/kairos-elizabeth2.jpg", NameStr
     print(success)
 }
  */
- 
+
+/*
 RecogniseFace(ImageString: "http://media.kairos.com/kairos-elizabeth2.jpg", GalleryString: "MyGallery"){success in
     print(success)
 }
+ */
 
 /*
- RemoveID(NameString: "Elizabeth", GalleryString: "MyGallery"){success in
+ RemoveID(NameString: "Simon1", GalleryString: "MyGallery"){success in
  print(success)
  }
  */
+
 
 
 
